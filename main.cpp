@@ -629,7 +629,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	D3D12_BLEND_DESC blendDesc{};
 	//すべての色要素を書き込む
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-
+	blendDesc.RenderTarget[0].BlendEnable = true;
+	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
 
 	///===================================================================
 	///RasterizerState(ラスタライザステート)
@@ -737,7 +743,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	///===================================================================
 
 	//モデル読み込み
-	ModelData modelData = LoadObjFile("resources", "axis.obj");
+	ModelData modelData = LoadObjFile("resources", "fence.obj");
 	//頂点リソースを作る
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource = CreateBufferResource(device, sizeof(VertexData) * modelData.vertices.size());
 	//頂点バッファビューを作成する
@@ -1241,47 +1247,31 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//ImGui
 			//===================================================
 
-			ImGui::Begin("Setting");
+			ImGui::Begin("Settings");
+			ImGui::DragFloat3("Camera Translate", &cameraTransform.translate.x);
+			ImGui::SliderAngle("Camera RotateX", &cameraTransform.rotate.x);
+			ImGui::SliderAngle("Camera RotateY", &cameraTransform.rotate.y);
+			ImGui::SliderAngle("Camera RotateZ", &cameraTransform.rotate.z);
 
-			ImGui::Text("camera");
-			ImGui::SliderFloat3("cameraPosition", &cameraTransform.translate.x, -100.0f, 0.0f);
+			ImGui::ColorEdit4("Sphere Color", &materialData->color.x);
+			ImGui::DragFloat3("Sphere Translate", &transform.translate.x);
+			ImGui::SliderAngle("Sphere RotateX", &transform.rotate.x);
+			ImGui::SliderAngle("Sphere RotateY", &transform.rotate.y);
+			ImGui::SliderAngle("Sphere RotateZ", &transform.rotate.z);
+			ImGui::SliderFloat3("scale", &transform.scale.x, 0.0f, 5.0f);
+
+			ImGui::ColorEdit3("Sprite Color", &materialDataSprite->color.x);
+			ImGui::DragFloat3("Sprite Translate", &transformSprite.translate.x);
+			ImGui::DragFloat3("Sprite Scale", &transformSprite.scale.x);
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
+			
+			ImGui::ColorEdit4("Lighting Color", &directionalLightData->color.x);
+			ImGui::SliderFloat3("Lighting Direction", &directionalLightData->direction.x, -1.0f, 1.0f);
+			ImGui::DragFloat("Intensity", &directionalLightData->intensity,0.01f);
 
-			//改行
-			ImGui::NewLine();
-
-			if (ImGui::CollapsingHeader("material"))
-			{
-				ImGui::ColorEdit4("color", &materialData->color.x);
-			}
-
-			if (ImGui::CollapsingHeader("vertexData"))
-			{
-				ImGui::SliderFloat3("translate", &transform.translate.x, -20.0f, 20.0f);
-				ImGui::SliderAngle("rotationX", &transform.rotate.x);
-				ImGui::SliderAngle("rotationY", &transform.rotate.y);
-				ImGui::SliderAngle("rotationZ", &transform.rotate.z);
-				ImGui::SliderFloat3("scale", &transform.scale.x, 0.0f, 5.0f);
-			}
-			if (ImGui::CollapsingHeader("vertexDataSprite"))
-			{
-				ImGui::SliderFloat3("translate", &transformSprite.translate.x, -20.0f, 20.0f);
-				ImGui::SliderFloat3("scale", &transformSprite.scale.x, 0.0f, 5.0f);
-			}
-			if (ImGui::CollapsingHeader("Lighting"))
-			{
-				ImGui::ColorEdit4("color", &directionalLightData->color.x);
-				ImGui::SliderFloat3("direction", &directionalLightData->direction.x, -1.0f, 1.0f);
-				ImGui::SliderFloat("intensity", &directionalLightData->intensity, 0.0f, 1.0f);
-
-			}
-
-			if (ImGui::CollapsingHeader("UVTransform"))
-			{
-				ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
-				ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
-				ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
-			}
+			ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
+			ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
+			ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
 
 			ImGui::End();
 
@@ -1399,7 +1389,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//wvp用のCBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 			//SRVのDescriptorTableの先頭を設定。2はrootPatameter[2]である。
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU2);
 
 			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
 			//描画！
