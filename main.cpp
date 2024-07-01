@@ -742,8 +742,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	///モデルの生成読み込み
 	///===================================================================
 
-	//モデル読み込み
-	ModelData modelData = LoadObjFile("resources", "fence.obj");
+	////モデル読み込み
+	//ModelData modelData = LoadObjFile("resources", "fence.obj");
+
+	ModelData modelData;
+	modelData.vertices.push_back({ .position = { 1.0f,1.0f,0.0f,1.0f },.texcoord = { 0.0f,0.0f },.normal = { 0.0f,0.0f,1.0f } });		//左上
+	modelData.vertices.push_back({ .position = { -1.0f,1.0f,0.0f,1.0f },.texcoord = { 1.0f,0.0f },.normal = { 0.0f,0.0f,1.0f } });
+	modelData.vertices.push_back({ .position = { 1.0f,-1.0f,0.0f,1.0f },.texcoord = { 0.0f,1.0f },.normal = { 0.0f,0.0f,1.0f } });
+	modelData.vertices.push_back({ .position = { 1.0f,-1.0f,0.0f,1.0f },.texcoord = { 0.0f,1.0f },.normal = { 0.0f,0.0f,1.0f } });
+	modelData.vertices.push_back({ .position = { -1.0f,1.0f,0.0f,1.0f },.texcoord = { 1.0f,0.0f },.normal = { 0.0f,0.0f,1.0f } });
+	modelData.vertices.push_back({ .position = {-1.0f,-1.0f,0.0f,1.0f },.texcoord = { 1.0f,1.0f },.normal = { 0.0f,0.0f,1.0f } });
+	modelData.material.textureFilePath = "./resources/uvChecker.png";
+
 	//頂点リソースを作る
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource = CreateBufferResource(device, sizeof(VertexData) * modelData.vertices.size());
 	//頂点バッファビューを作成する 
@@ -953,24 +963,36 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	///TransformationMatrix用のResourceを作る
 	///===================================================================
 
+	//粒の数
+	int instanceCount = 10;
+
 	//WVP用のリソースを作る。Matrix4x4　１つ分サイズを用意する
-	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource = CreateBufferResource(device, sizeof(TransformationMatrix));
+	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource = CreateBufferResource(device, sizeof(TransformationMatrix) * instanceCount);
 	//データを書き込む
 	TransformationMatrix* wvpData = nullptr;
+
 	//書き込むためのアドレスを取得
 	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
 	//単位行列を書き込んでおく
 
-	wvpData->WVP = MakeIdentity4x4();
-	wvpData->World = MakeIdentity4x4();
-
+	for (int i = 0; i < instanceCount; ++i) {
+		wvpData[i].WVP = MakeIdentity4x4();
+		wvpData[i].World = MakeIdentity4x4();
+	}
 
 	//Transform変数を作る
-	Transform transform{
+	/*Transform transform{
 		{1.0f,1.0f,1.0f},
 		{0.0f,0.0f,0.0f},
 		{0.0f,0.0f,0.0f}
-	};
+	};*/
+
+	std::vector<Transform> transform(instanceCount, {
+		{ 1.0f,1.0f,1.0f },
+		{ 0.0f,0.0f,0.0f },
+		{ 0.0f,0.0f,0.0f }
+	});
+
 
 
 	Transform cameraTransform{
@@ -986,14 +1008,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		{ 0.0f,0.0f,0.0f }
 	};
 
-	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
-	Matrix4x4 cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
-	Matrix4x4 viewMatrix = Inverse(cameraMatrix);
-	Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
-	Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-	wvpData->WVP = worldViewProjectionMatrix;
-	wvpData->World = worldMatrix;
+	Matrix4x4 worldMatrix;
+	Matrix4x4 cameraMatrix;
+	Matrix4x4 viewMatrix;
+	Matrix4x4 projectionMatrix;
+	Matrix4x4 worldViewProjectionMatrix;
 
+	for (Transform transform_transform : transform) {
+		worldMatrix = MakeAffineMatrix(transform_transform.scale, transform_transform.rotate, transform_transform.translate);
+		cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
+		viewMatrix = Inverse(cameraMatrix);
+		projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
+		worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
+		wvpData->WVP = worldViewProjectionMatrix;
+		wvpData->World = worldMatrix;
+	}
 
 	///===================================================================
 	///VertexShaderで利用するTransformationMatrix用のResourceを作る
@@ -1253,12 +1282,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::SliderAngle("Camera RotateY", &cameraTransform.rotate.y);
 			ImGui::SliderAngle("Camera RotateZ", &cameraTransform.rotate.z);
 
-			ImGui::ColorEdit4("Sphere Color", &materialData->color.x);
+		/*	ImGui::ColorEdit4("Sphere Color", &materialData->color.x);
 			ImGui::DragFloat3("Sphere Translate", &transform.translate.x);
 			ImGui::SliderAngle("Sphere RotateX", &transform.rotate.x);
 			ImGui::SliderAngle("Sphere RotateY", &transform.rotate.y);
 			ImGui::SliderAngle("Sphere RotateZ", &transform.rotate.z);
-			ImGui::SliderFloat3("scale", &transform.scale.x, 0.0f, 5.0f);
+			ImGui::SliderFloat3("scale", &transform.scale.x, 0.0f, 5.0f);*/
 
 			ImGui::ColorEdit3("Sprite Color", &materialDataSprite->color.x);
 			ImGui::DragFloat3("Sprite Translate", &transformSprite.translate.x);
@@ -1285,13 +1314,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//===================================================
 
 			//vertexDataの変換
-			worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
-			cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
-			viewMatrix = Inverse(cameraMatrix);
-			projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
-			worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-			wvpData->WVP = worldViewProjectionMatrix;
-			wvpData->World = worldMatrix;
+			for (Transform transform_transform : transform) {
+				worldMatrix = MakeAffineMatrix(transform_transform.scale, transform_transform.rotate, transform_transform.translate);
+				cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
+				viewMatrix = Inverse(cameraMatrix);
+				projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
+				worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
+				wvpData->WVP = worldViewProjectionMatrix;
+				wvpData->World = worldMatrix;
+			}
 
 
 			//vertexDetaSpriteの変換
@@ -1387,14 +1418,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//マテリアルCBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 			//wvp用のCBufferの場所を設定
-			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
+			//commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 			//SRVのDescriptorTableの先頭を設定。2はrootPatameter[2]である。
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU2);
 
 			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
 			//描画！
-			commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
 
+			for (int instanceCount = 0; instanceCount < instanceCount; ++instanceCount) {
+				commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
+				commandList->DrawInstanced(UINT(modelData.vertices.size()),instanceCount , 0, 0);
+			}
 
 			//Spriteの描画。変更が必要なものだけ変更する
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
