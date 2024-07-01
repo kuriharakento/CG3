@@ -1253,11 +1253,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::SliderAngle("Camera RotateY", &cameraTransform.rotate.y);
 			ImGui::SliderAngle("Camera RotateZ", &cameraTransform.rotate.z);
 
-			ImGui::ColorEdit4("Sphere Color", &materialData->color.x);
-			ImGui::DragFloat3("Sphere Translate", &transform.translate.x);
-			ImGui::SliderAngle("Sphere RotateX", &transform.rotate.x);
-			ImGui::SliderAngle("Sphere RotateY", &transform.rotate.y);
-			ImGui::SliderAngle("Sphere RotateZ", &transform.rotate.z);
+			ImGui::ColorEdit4("Fence Color", &materialData->color.x);
+			ImGui::DragFloat3("Fence Translate", &transform.translate.x);
+			ImGui::SliderAngle("Fence RotateX", &transform.rotate.x);
+			ImGui::SliderAngle("Fence RotateY", &transform.rotate.y);
+			ImGui::SliderAngle("Fence RotateZ", &transform.rotate.z);
 			ImGui::SliderFloat3("scale", &transform.scale.x, 0.0f, 5.0f);
 
 			ImGui::ColorEdit3("Sprite Color", &materialDataSprite->color.x);
