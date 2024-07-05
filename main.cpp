@@ -1014,14 +1014,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	Matrix4x4 projectionMatrix;
 	Matrix4x4 worldViewProjectionMatrix;
 
-	for (Transform transform_transform : transform) {
-		worldMatrix = MakeAffineMatrix(transform_transform.scale, transform_transform.rotate, transform_transform.translate);
+	for(int i = 0;i < instanceCount;++i){
+		worldMatrix = MakeAffineMatrix(transform[i].scale, transform[i].rotate, transform[i].translate);
 		cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
 		viewMatrix = Inverse(cameraMatrix);
 		projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
 		worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-		wvpData->WVP = worldViewProjectionMatrix;
-		wvpData->World = worldMatrix;
+		wvpData[i].WVP = worldViewProjectionMatrix;
+		wvpData[i].World = worldMatrix;
 	}
 
 	///===================================================================
@@ -1314,16 +1314,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//===================================================
 
 			//vertexDataの変換
-			for (Transform transform_transform : transform) {
-				worldMatrix = MakeAffineMatrix(transform_transform.scale, transform_transform.rotate, transform_transform.translate);
+			for (int i = 0; i < instanceCount; ++i) {
+				worldMatrix = MakeAffineMatrix(transform[i].scale, transform[i].rotate, transform[i].translate);
 				cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
 				viewMatrix = Inverse(cameraMatrix);
 				projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
 				worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-				wvpData->WVP = worldViewProjectionMatrix;
-				wvpData->World = worldMatrix;
+				wvpData[i].WVP = worldViewProjectionMatrix;
+				wvpData[i].World = worldMatrix;
 			}
-
 
 			//vertexDetaSpriteの変換
 			worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
@@ -1425,10 +1424,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
 			//描画！
 
-			for (int instanceCount = 0; instanceCount < instanceCount; ++instanceCount) {
-				commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
-				commandList->DrawInstanced(UINT(modelData.vertices.size()),instanceCount , 0, 0);
-			}
+			
+			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
+			commandList->DrawInstanced(UINT(modelData.vertices.size()),instanceCount , 0, 0);
+			
 
 			//Spriteの描画。変更が必要なものだけ変更する
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
