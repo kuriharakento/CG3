@@ -478,6 +478,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 
+	D3D12_DESCRIPTOR_RANGE descriptorRangeForInstancing[1] = {};
+	descriptorRangeForInstancing[0].BaseShaderRegister = 0;
+	descriptorRangeForInstancing[0].NumDescriptors = 1;
+	descriptorRangeForInstancing[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descriptorRangeForInstancing[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	///===================================================================
 	///SwapChainからResourceを引っ張ってくる
@@ -553,6 +558,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 	rootParameters[1].Descriptor.ShaderRegister = 0;
+	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+	rootParameters[1].DescriptorTable.pDescriptorRanges = descriptorRangeForInstancing;
+	rootParameters[1].DescriptorTable.NumDescriptorRanges = _countof(descriptorRangeForInstancing);
 
 	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;			//DescriptorTableを使う
 	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;						//PixelShaderで使う
@@ -563,6 +572,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[3].Descriptor.RegisterSpace = 0;
 	rootParameters[3].Descriptor.ShaderRegister = 1;
+
+
+	
 
 	//Smaplerの設定
 	D3D12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
@@ -654,10 +666,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	///===================================================================
 
 	//shaderをコンパイルする
-	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = CompileSharder(L"Object3d.VS.hlsl", L"vs_6_0", dxcUtils, dxcCompiler, includeHandler);
+	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = CompileSharder(L"Particle.VS.hlsl", L"vs_6_0", dxcUtils, dxcCompiler, includeHandler);
 	assert(vertexShaderBlob != nullptr);
 
-	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = CompileSharder(L"Object3d.PS.hlsl", L"ps_6_0", dxcUtils, dxcCompiler, includeHandler);
+	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = CompileSharder(L"Particle.PS.hlsl", L"ps_6_0", dxcUtils, dxcCompiler, includeHandler);
 	assert(pixelShaderBlob != nullptr);
 
 
@@ -963,22 +975,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	///TransformationMatrix用のResourceを作る
 	///===================================================================
 
-	//粒の数
-	int instanceCount = 10;
+	////粒の数
+	//int instanceCount = 10;
 
-	//WVP用のリソースを作る。Matrix4x4　１つ分サイズを用意する
-	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource = CreateBufferResource(device, sizeof(TransformationMatrix) * instanceCount);
-	//データを書き込む
-	TransformationMatrix* wvpData = nullptr;
+	////WVP用のリソースを作る。Matrix4x4　１つ分サイズを用意する
+	//Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource = CreateBufferResource(device, sizeof(TransformationMatrix) * instanceCount);
+	////データを書き込む
+	//TransformationMatrix* wvpData = nullptr;
 
-	//書き込むためのアドレスを取得
-	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
-	//単位行列を書き込んでおく
+	////書き込むためのアドレスを取得
+	//wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
+	////単位行列を書き込んでおく
 
-	for (int i = 0; i < instanceCount; ++i) {
-		wvpData[i].WVP = MakeIdentity4x4();
-		wvpData[i].World = MakeIdentity4x4();
-	}
+	//for (int i = 0; i < instanceCount; ++i) {
+	//	wvpData[i].WVP = MakeIdentity4x4();
+	//	wvpData[i].World = MakeIdentity4x4();
+	//}
+
 
 	//Transform変数を作る
 	/*Transform transform{
@@ -987,13 +1000,43 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		{0.0f,0.0f,0.0f}
 	};*/
 
-	std::vector<Transform> transform(instanceCount, {
+	/*std::vector<Transform> transform(instanceCount, {
 		{ 1.0f,1.0f,1.0f },
 		{ 0.0f,0.0f,0.0f },
 		{ 0.0f,0.0f,0.0f }
-	});
+	});*/
+
+	///===================================================================
+	///インスタンシング用のResourceを作成
+	///===================================================================
+
+	const uint32_t kNumInstance = 10;
+
+	//Instancing用のTransformationMatrixリソースを作る
+	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource = CreateBufferResource(device, sizeof(TransformationMatrix) * kNumInstance);
+	//書き込むためのアドレスを取得
+	TransformationMatrix* instancingData = nullptr;
+	instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&instancingData));
+
+	//単位行列を書き込んでおく
+	for(uint32_t index = 0;index < kNumInstance;++index)
+	{
+		instancingData[index].WVP = MakeIdentity4x4();
+		instancingData[index].World = MakeIdentity4x4();
+	}
 
 
+	///===================================================================
+	///ワールド変換
+	///===================================================================
+
+	Transform transforms[kNumInstance];
+	for(int32_t index = 0;index < kNumInstance;++index)
+	{
+		transforms[index].scale = { 1.0f,1.0f,1.0f };
+		transforms[index].rotate = { 0.0f,0.0f,0.0f };
+		transforms[index].translate = { index * 0.1f,index * 0.1f,index * 0.1f };
+	}
 
 	Transform cameraTransform{
 		{1.0f,1.0f,1.0f},
@@ -1008,21 +1051,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		{ 0.0f,0.0f,0.0f }
 	};
 
-	Matrix4x4 worldMatrix;
-	Matrix4x4 cameraMatrix;
-	Matrix4x4 viewMatrix;
-	Matrix4x4 projectionMatrix;
-	Matrix4x4 worldViewProjectionMatrix;
 
-	for(int i = 0;i < instanceCount;++i){
-		worldMatrix = MakeAffineMatrix(transform[i].scale, transform[i].rotate, transform[i].translate);
-		cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
-		viewMatrix = Inverse(cameraMatrix);
-		projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
-		worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-		wvpData[i].WVP = worldViewProjectionMatrix;
-		wvpData[i].World = worldMatrix;
+	Matrix4x4 viewMatrix = MakeIdentity4x4();
+	Matrix4x4 projectionMatrix = MakeOrthographicMatrix(0.0f, 0.0f, float(kClientWidth), float(kClientHeight), 0.0f, 100.0f);
+	Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
+
+	for(uint32_t index = 0;index < kNumInstance; ++index)
+	{
+		Matrix4x4 worldMatrix = MakeAffineMatrix(transforms[index].scale, transforms[index].rotate, transforms[index].translate);
+		Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, viewProjectionMatrix);
+		instancingData[index].WVP = worldViewProjectionMatrix;
+		instancingData[index].World = worldMatrix;
 	}
+	
 
 	///===================================================================
 	///VertexShaderで利用するTransformationMatrix用のResourceを作る
@@ -1214,6 +1255,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//SRVの生成
 	device->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
 
+	///===================================================================
+	///Instancing用のSRVの作成
+	///===================================================================
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC instancingSrvDesc{};
+	instancingSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
+	instancingSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	instancingSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	instancingSrvDesc.Buffer.FirstElement = 0;
+	instancingSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+	instancingSrvDesc.Buffer.NumElements = kNumInstance;
+	instancingSrvDesc.Buffer.StructureByteStride = sizeof(TransformationMatrix);
+	D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU = GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 3);
+	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU = GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 3);
+	device->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
 
 	///===================================================================
 	///ImGuiの初期化
@@ -1282,13 +1338,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::SliderAngle("Camera RotateY", &cameraTransform.rotate.y);
 			ImGui::SliderAngle("Camera RotateZ", &cameraTransform.rotate.z);
 
-		/*	ImGui::ColorEdit4("Sphere Color", &materialData->color.x);
-			ImGui::DragFloat3("Sphere Translate", &transform.translate.x);
-			ImGui::SliderAngle("Sphere RotateX", &transform.rotate.x);
-			ImGui::SliderAngle("Sphere RotateY", &transform.rotate.y);
-			ImGui::SliderAngle("Sphere RotateZ", &transform.rotate.z);
-			ImGui::SliderFloat3("scale", &transform.scale.x, 0.0f, 5.0f);*/
-
 			ImGui::ColorEdit3("Sprite Color", &materialDataSprite->color.x);
 			ImGui::DragFloat3("Sprite Translate", &transformSprite.translate.x);
 			ImGui::DragFloat3("Sprite Scale", &transformSprite.scale.x);
@@ -1305,24 +1354,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::End();
 
 
-			//ゲームの処理が終わり描画処理に入る前にImGuiの内部コマンドを生成する
-			ImGui::Render();
-
-
-			//===================================================
-			//vertexData
-			//===================================================
-
-			//vertexDataの変換
-			for (int i = 0; i < instanceCount; ++i) {
-				worldMatrix = MakeAffineMatrix(transform[i].scale, transform[i].rotate, transform[i].translate);
-				cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
-				viewMatrix = Inverse(cameraMatrix);
-				projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
-				worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-				wvpData[i].WVP = worldViewProjectionMatrix;
-				wvpData[i].World = worldMatrix;
+			for (uint32_t index = 0; index < kNumInstance; ++index)
+			{
+				Matrix4x4 worldMatrix = MakeAffineMatrix(transforms[index].scale, transforms[index].rotate, transforms[index].translate);
+				Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, viewProjectionMatrix);
+				instancingData[index].WVP = worldViewProjectionMatrix;
+				instancingData[index].World = worldMatrix;
 			}
+
 
 			//vertexDetaSpriteの変換
 			worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
@@ -1338,18 +1377,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransformSprite.translate));
 			materialDataSprite->uvTransform = uvTransformMatrix;
 
+
+			//ゲームの処理が終わり描画処理に入る前にImGuiの内部コマンドを生成する
+			ImGui::Render();
+			
+
 			///===================================================================
 			///
 			///ゲームの処理		描画処理
 			///
 			///===================================================================
-
-
-
-
-
-
-
 
 
 			///===================================================================
@@ -1419,29 +1456,29 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//wvp用のCBufferの場所を設定
 			//commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 			//SRVのDescriptorTableの先頭を設定。2はrootPatameter[2]である。
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU2);
+			//commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU2);
 
-			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
+			//commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
+
+			commandList->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
+
 			//描画！
+			commandList->DrawInstanced(6, kNumInstance,0, 0);
 
-			
-			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
-			commandList->DrawInstanced(UINT(modelData.vertices.size()),instanceCount , 0, 0);
-			
 
-			//Spriteの描画。変更が必要なものだけ変更する
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
-			//IBVを設定
-			commandList->IASetIndexBuffer(&indexBufferViewSprite);
-			//CBuffer
-			commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
+			////Spriteの描画。変更が必要なものだけ変更する
+			//commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+			////IBVを設定
+			//commandList->IASetIndexBuffer(&indexBufferViewSprite);
+			////CBuffer
+			//commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
 
-			//TransformationMatrixCBufferの場所を設定
-			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+			////TransformationMatrixCBufferの場所を設定
+			//commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 			//SRVのDescriptorTableの先頭を設定。2はrootPatameter[2]である。
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+			//commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 
-			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
+			//commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
 
 			//スプライトの描画(DrawCall//ドローコール)
 			//commandList->DrawIndexedInstanced(6, 1, 0, 0,0);
