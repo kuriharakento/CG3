@@ -11,6 +11,7 @@
 #include <sstream>
 #include <wrl.h>
 #include <random>
+#include <numbers>
 
 #include "externals/DirectXTex/d3dx12.h"
 #include "externals/DirectXTex/DirectXTex.h"
@@ -71,6 +72,17 @@ struct Matrix3x3
 struct Matrix4x4
 {
 	float m[4][4];
+	Matrix4x4 operator*(const Matrix4x4& other) const {
+		Matrix4x4 result = {};
+		for (int i = 0; i < 4; ++i) {
+			for (int j = 0; j < 4; ++j) {
+				for (int k = 0; k < 4; ++k) {
+					result.m[i][j] += m[i][k] * other.m[k][j];
+				}
+			}
+		}
+		return result;
+	}
 };
 
 struct TransformationMatrix
@@ -1046,6 +1058,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		{0.0f,0.0,-10.0f}
 	};
 
+	/*Transform cameraTransform{
+		{1.0f,1.0f,1.0f},
+		{std::numbers::pi_v<float> / 3.0f,std::numbers::pi_v<float>,0.0f},
+		{0.0f,23.0f,10.0f}
+	};*/
+
 	//UVTransform用の変数
 	Transform uvTransformSprite{
 		{ 1.0f,1.0f,1.0f },
@@ -1303,7 +1321,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	///===================================================================
 
 	bool useMonsterBall = true;
-
+	//ビルボードを使うかどうか
+	bool useBillboard = false;
 
 	///===================================================================
 	///
@@ -1358,6 +1377,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::DragFloat3("Sprite Translate", &transformSprite.translate.x);
 			ImGui::DragFloat3("Sprite Scale", &transformSprite.scale.x);
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
+			ImGui::Checkbox("useBillboard", &useBillboard);
 
 			ImGui::ColorEdit4("Lighting Color", &directionalLightData->color.x);
 			ImGui::SliderFloat3("Lighting Direction", &directionalLightData->direction.x, -1.0f, 1.0f);
@@ -1407,11 +1427,26 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 					continue;
 				}
 
-				particles[index].transform.translate += particles[index].velocity * kDeltaTime;
-				particles[index].currentTime += kDeltaTime;
+				//particles[index].transform.translate += particles[index].velocity * kDeltaTime;
+				//particles[index].currentTime += kDeltaTime;
 				float alpha = 1.0f - (particles[index].currentTime / particles[index].lifeTime);
 
-				Matrix4x4 worldMatrixInstancing = MakeAffineMatrix(particles[index].transform.scale, particles[index].transform.rotate, particles[index].transform.translate);
+				//ビルボード
+				Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(std::numbers::pi_v<float>);
+				Matrix4x4 billboardMatrix = MakeIdentity4x4();;
+				if(useBillboard)
+				{
+					billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
+				}
+				
+				billboardMatrix.m[3][0] = 0.0f;
+				billboardMatrix.m[3][1] = 0.0f;
+				billboardMatrix.m[3][2] = 0.0f;
+				Matrix4x4 scaleMatrix = MakeScaleMatrix(particles[index].transform.scale);
+				Matrix4x4 translateMatrix = MakeTranslateMatrix(particles[index].transform.translate);
+
+				//Matrix4x4 worldMatrixInstancing = MakeAffineMatrix(particles[index].transform.scale, particles[index].transform.rotate, particles[index].transform.translate);
+				Matrix4x4 worldMatrixInstancing = scaleMatrix * billboardMatrix * translateMatrix;
 				Matrix4x4 worldViewProjectionMatrixInstancing = Multiply(worldMatrixInstancing, Multiply(viewMatrix, projectionMatrix));
 				instancingData[index].WVP = worldViewProjectionMatrixInstancing;
 				instancingData[index].World = worldMatrixInstancing;
