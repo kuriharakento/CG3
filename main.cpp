@@ -158,6 +158,19 @@ struct Emitter
 	float frequencyTime;	//!<頻度用時刻
 };
 
+struct AABB
+{
+	Vector3 min;//!<最小点
+	Vector3 max;//!< 最大点
+};
+
+//場
+struct AccelerationField
+{
+	Vector3 acceleration;		//!<<加速度
+	AABB area;					//!<AABB
+};
+
 struct D3DResourceLeakChecker
 {
 	~D3DResourceLeakChecker()
@@ -287,6 +300,18 @@ std::list<Particle> Emit(const Emitter& emitter,std::mt19937& randomEngine)
 		particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
 	}
 	return particles;
+}
+
+bool IsCollision(const AABB& aabb,const Vector3& point)
+{
+	if (point.x < aabb.min.x) return false;
+	if (point.y < aabb.min.y) return false;
+	if (point.z < aabb.min.z) return false;
+	if (point.x > aabb.max.x) return false;
+	if (point.y > aabb.max.y) return false;
+	if (point.z > aabb.max.z) return false;
+	return true;
+
 }
 
 //ウィンドウプロシージャ
@@ -1073,17 +1098,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	};
 
 
+	//Transform cameraTransform{
+	//	{1.0f,1.0f,1.0f},
+	//	{0.0f,0.0f,0.0f},
+	//	{0.0f,0.0,-10.0f}
+	//};
+
 	Transform cameraTransform{
 		{1.0f,1.0f,1.0f},
-		{0.0f,0.0f,0.0f},
-		{0.0f,0.0,-10.0f}
+		{std::numbers::pi_v<float> / 4,0.0f,0.0f},
+		{0.0f,10.0f,-10.0f}
 	};
-
-	/*Transform cameraTransform{
-		{1.0f,1.0f,1.0f},
-		{std::numbers::pi_v<float> / 3.0f,std::numbers::pi_v<float>,0.0f},
-		{0.0f,23.0f,10.0f}
-	};*/
 
 	//UVTransform用の変数
 	Transform uvTransformSprite{
@@ -1336,6 +1361,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//パーティクルの生成
 	std::list<Particle> particles;
 
+	//発生源
 	Emitter emitter;
 	emitter.count = 3;
 	emitter.frequency = 0.5f;
@@ -1345,6 +1371,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		{ 0.0f,0.0f,0.0f },
 		{ 0.0f,0.0f,0.0f }
 	};
+
+	//風
+	AccelerationField accelerationField;
+	accelerationField.acceleration = { 15.0f,0.0f,0.0f };
+	accelerationField.area.min = { -1.0f,-1.0f,1.0f };
+	accelerationField.area.max = { 1.0f,1.0f,1.0f };
+	bool useAccelerationField = false;
 
 	///===================================================================
 	///
@@ -1382,36 +1415,50 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//ImGui
 			//===================================================
 
+			//各種設定
 			ImGui::Begin("Settings");
-			ImGui::DragFloat3("Camera Translate", &cameraTransform.translate.x,0.1f);
-			ImGui::SliderAngle("Camera RotateX", &cameraTransform.rotate.x);
-			ImGui::SliderAngle("Camera RotateY", &cameraTransform.rotate.y);
-			ImGui::SliderAngle("Camera RotateZ", &cameraTransform.rotate.z);
-			if(ImGui::Button("Add Particles"))
-			{
-				particles.splice(particles.end(), Emit(emitter, randomEngine));
-			}
-			ImGui::DragFloat3("EmitterTranslate", &emitter.transform.translate.x, 0.1f);
 			//ImGui::ColorEdit4("Fence Color", &materialData->color.x);
 			/*ImGui::DragFloat3("Instancing Translate", &particles[0].transform.translate.x);
 			ImGui::SliderAngle("Instancing RotateX", &particles[0].transform.rotate.x);
 			ImGui::SliderAngle("Instancing RotateY", &particles[0].transform.rotate.y);
 			ImGui::SliderAngle("Instancing RotateZ", &particles[0].transform.rotate.z);
 			ImGui::SliderFloat3("Instancing", &particles[0].transform.scale.x, 0.0f, 5.0f);*/
-
 			ImGui::ColorEdit3("Sprite Color", &materialDataSprite->color.x);
 			ImGui::DragFloat3("Sprite Translate", &transformSprite.translate.x);
 			ImGui::DragFloat3("Sprite Scale", &transformSprite.scale.x);
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
-			ImGui::Checkbox("useBillboard", &useBillboard);
-
 			ImGui::ColorEdit4("Lighting Color", &directionalLightData->color.x);
 			ImGui::SliderFloat3("Lighting Direction", &directionalLightData->direction.x, -1.0f, 1.0f);
 			ImGui::DragFloat("Intensity", &directionalLightData->intensity, 0.01f);
-
 			ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
 			ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
 			ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
+			ImGui::End();
+
+			//カメラ
+			ImGui::Begin("Camera");
+			ImGui::DragFloat3("Camera Translate", &cameraTransform.translate.x,0.1f);
+			ImGui::SliderAngle("Camera RotateX", &cameraTransform.rotate.x);
+			ImGui::SliderAngle("Camera RotateY", &cameraTransform.rotate.y);
+			ImGui::SliderAngle("Camera RotateZ", &cameraTransform.rotate.z);
+			ImGui::End();
+
+			//パーティクル
+			ImGui::Begin("Particle");
+			ImGui::DragFloat3("EmitterTranslate", &emitter.transform.translate.x, 0.1f);
+			ImGui::Checkbox("useBillboard", &useBillboard);
+			ImGui::Checkbox("useAccelerationField", &useAccelerationField);
+			if(ImGui::Button("Add Particles"))
+			{
+				particles.splice(particles.end(), Emit(emitter, randomEngine));
+			}
+			float areaMin = accelerationField.area.min.x;
+			float areaMax = accelerationField.area.max.x;
+			ImGui::DragFloat("Acceleration.area.Min", &areaMin, 0.1f);
+			ImGui::DragFloat("Acceleration.area.Max", &areaMax, 0.1f);
+			accelerationField.area.min = { areaMin,areaMin,areaMin };
+			accelerationField.area.max = { areaMax,areaMax,areaMax };
+			
 
 			ImGui::End();
 
@@ -1452,6 +1499,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 					particleItr= particles.erase(particleItr);
 					continue;
 				}
+
+				//Fieldの範囲内のParticleには加速度を適用する
+				if (useAccelerationField) {
+					if (IsCollision(accelerationField.area, particleItr->transform.translate))
+					{
+						particleItr->velocity += accelerationField.acceleration * kDeltaTime;
+					}
+				}
+
 				particleItr->transform.translate += particleItr->velocity * kDeltaTime;
 				particleItr->currentTime += kDeltaTime;
 				float alpha = 1.0f - (particleItr->currentTime / particleItr->lifeTime);
@@ -1460,8 +1516,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 				{
 					//ビルボード
 					Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
+					Matrix4x4 billboardMatrix = MakeIdentity4x4();
 					//カメラの回転を適用
-					Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
+					if (useBillboard)
+					{
+						billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
+					}
 					billboardMatrix.m[3][0] = 0.0f;
 					billboardMatrix.m[3][1] = 0.0f;
 					billboardMatrix.m[3][2] = 0.0f;
