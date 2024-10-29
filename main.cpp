@@ -1448,17 +1448,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::DragFloat3("EmitterTranslate", &emitter.transform.translate.x, 0.1f);
 			ImGui::Checkbox("useBillboard", &useBillboard);
 			ImGui::Checkbox("useAccelerationField", &useAccelerationField);
-			if(ImGui::Button("Add Particles"))
-			{
-				particles.splice(particles.end(), Emit(emitter, randomEngine));
-			}
 			float areaMin = accelerationField.area.min.x;
 			float areaMax = accelerationField.area.max.x;
-			ImGui::DragFloat("Acceleration.area.Min", &areaMin, 0.1f);
-			ImGui::DragFloat("Acceleration.area.Max", &areaMax, 0.1f);
+			ImGui::DragFloat("Field.aabb.Min", &areaMin, 0.1f);
+			ImGui::DragFloat("Field.aabb.Max", &areaMax, 0.1f);
 			accelerationField.area.min = { areaMin,areaMin,areaMin };
 			accelerationField.area.max = { areaMax,areaMax,areaMax };
-			
+			ImGui::DragFloat3("FieldAcceleration", &accelerationField.acceleration.x, 0.1f);
 
 			ImGui::End();
 
