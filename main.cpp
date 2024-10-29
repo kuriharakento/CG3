@@ -147,6 +147,14 @@ struct ParticleForGPU
 	Vector4 color;
 };
 
+struct Emitter
+{
+	Transform transform;	//!<エミッタの位置
+	uint32_t count;			//!<生成するパーティクルの数
+	float frequency;		//!<生成する頻度
+	float frequencyTime;	//!<頻度用時刻
+};
+
 struct D3DResourceLeakChecker
 {
 	~D3DResourceLeakChecker()
@@ -265,8 +273,18 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 MaterialData LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename);
 
 //パーティクル生成関数
-Particle MakeNewParticle(std::mt19937& randomEngine)
-;
+Particle MakeNewParticle(std::mt19937& randomEngine);
+
+//エミッタからパーティクルを発生させる
+std::list<Particle> Emit(const Emitter& emitter,std::mt19937& randomEngine)
+{
+	std::list<Particle> particles;
+	for(uint32_t count = 0;count < emitter.count;++count)
+	{
+		particles.push_back(MakeNewParticle(randomEngine));
+	}
+	return particles;
+}
 
 //ウィンドウプロシージャ
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
@@ -1319,6 +1337,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	particles.push_back(MakeNewParticle(randomEngine));
 	particles.push_back(MakeNewParticle(randomEngine));
 
+	Emitter emitter;
+	emitter.count = 3;
+
 	///===================================================================
 	///
 	///メインループ
@@ -1360,8 +1381,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::SliderAngle("Camera RotateX", &cameraTransform.rotate.x);
 			ImGui::SliderAngle("Camera RotateY", &cameraTransform.rotate.y);
 			ImGui::SliderAngle("Camera RotateZ", &cameraTransform.rotate.z);
+			if(ImGui::Button("Add Particles"))
+			{
+				particles.splice(particles.end(), Emit(emitter, randomEngine));
+			}
 
-			ImGui::ColorEdit4("Fence Color", &materialData->color.x);
+			//ImGui::ColorEdit4("Fence Color", &materialData->color.x);
 			/*ImGui::DragFloat3("Instancing Translate", &particles[0].transform.translate.x);
 			ImGui::SliderAngle("Instancing RotateX", &particles[0].transform.rotate.x);
 			ImGui::SliderAngle("Instancing RotateY", &particles[0].transform.rotate.y);
@@ -1415,39 +1440,42 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			
 			//instancing
 			uint32_t numInstance = 0;
-			for(std::list<Particle>::iterator particle = particles.begin();particle != particles.end();++particle)
+			for(std::list<Particle>::iterator particleItr = particles.begin();particleItr != particles.end();)
 			{
-				if(particle->lifeTime <= particle->currentTime)
+				if(particleItr->lifeTime <= particleItr->currentTime)
 				{
-					particle = particles.erase(particle);
-					if(particle == particles.end())
-					{
-						break;
-					}
+					particleItr= particles.erase(particleItr);
+					continue;
 				}
 				//particle->transform.translate += particle->velocity * kDeltaTime;
 				//particle->currentTime += kDeltaTime;
-				float alpha = 1.0f - (particle->currentTime / particle->lifeTime);
+				float alpha = 1.0f - (particleItr->currentTime / particleItr->lifeTime);
 
-				//ビルボード
-				Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
-				//カメラの回転を適用
-				Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
-				billboardMatrix.m[3][0] = 0.0f;
-				billboardMatrix.m[3][1] = 0.0f;
-				billboardMatrix.m[3][2] = 0.0f;
+				if (numInstance < kNumMaxInstance)
+				{
+					//ビルボード
+					Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
+					//カメラの回転を適用
+					Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
+					billboardMatrix.m[3][0] = 0.0f;
+					billboardMatrix.m[3][1] = 0.0f;
+					billboardMatrix.m[3][2] = 0.0f;
 
-				Matrix4x4 scaleMatrix = MakeScaleMatrix(particle->transform.scale);
-				Matrix4x4 translateMatrix = MakeTranslateMatrix(particle->transform.translate);
+					Matrix4x4 scaleMatrix = MakeScaleMatrix(particleItr->transform.scale);
+					Matrix4x4 translateMatrix = MakeTranslateMatrix(particleItr->transform.translate);
 
-				//Matrix4x4 worldMatrixInstancing = MakeAffineMatrix(particle->transform.scale, particle->transform.rotate, particle->transform.translate);
-				Matrix4x4 worldMatrixInstancing = scaleMatrix * billboardMatrix * translateMatrix;
-				Matrix4x4 worldViewProjectionMatrixInstancing = Multiply(worldMatrixInstancing, Multiply(viewMatrix, projectionMatrix));
-				instancingData[numInstance].WVP = worldViewProjectionMatrixInstancing;
-				instancingData[numInstance].World = worldMatrixInstancing;
-				instancingData[numInstance].color = particle->color;
-				instancingData[numInstance].color.w = alpha;
-				++numInstance;
+					//Matrix4x4 worldMatrixInstancing = MakeAffineMatrix(particle->transform.scale, particle->transform.rotate, particle->transform.translate);
+					Matrix4x4 worldMatrixInstancing = scaleMatrix * billboardMatrix * translateMatrix;
+					Matrix4x4 worldViewProjectionMatrixInstancing = Multiply(worldMatrixInstancing, Multiply(viewMatrix, projectionMatrix));
+					instancingData[numInstance].WVP = worldViewProjectionMatrixInstancing;
+					instancingData[numInstance].World = worldMatrixInstancing;
+					instancingData[numInstance].color = particleItr->color;
+					instancingData[numInstance].color.w = alpha;
+					//インスタンスの数を追加
+					++numInstance;
+				}
+				//次の要素に進める
+				++particleItr;
 			}
 			//for(uint32_t index = 0;index < kNumMaxInstance;++index)
 			//{
