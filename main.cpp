@@ -1110,22 +1110,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	transformationMatrixDataSprite->World = worldMatrixSprite;
 
 	///===================================================================
-	///Instancing用のTransformMatrix
-	///===================================================================
-
-	//乱数生成器の初期化
-	std::random_device seedGenerator;
-	std::mt19937 randomEngine(seedGenerator());
-
-	Particle particles[kNumMaxInstance];
-	for(uint32_t index = 0;index < kNumMaxInstance;++index)
-	{
-		particles[index] = MakeNewParticle(randomEngine);
-	}
-
-	
-
-	///===================================================================
 	///頂点位置を計算する
 	///===================================================================
 
@@ -1323,6 +1307,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	bool useMonsterBall = true;
 	//ビルボードを使うかどうか
 	bool useBillboard = false;
+
+
+	//乱数生成器の初期化
+	std::random_device seedGenerator;
+	std::mt19937 randomEngine(seedGenerator());
+	//パーティクルの生成
+	Particle particles[kNumMaxInstance];
+	for (uint32_t index = 0; index < kNumMaxInstance; ++index)
+	{
+		particles[index] = MakeNewParticle(randomEngine);
+	}
 
 	///===================================================================
 	///
