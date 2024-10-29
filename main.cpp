@@ -44,7 +44,10 @@ struct Vector3
 	float x;
 	float y;
 	float z;
-
+	// + オペレーター
+	Vector3 operator+(const Vector3& other) const {
+		return Vector3{ x + other.x, y + other.y, z + other.z };
+	}
 	Vector3& operator+=(const Vector3& other) {
 		x += other.x;
 		y += other.y;
@@ -273,7 +276,7 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 MaterialData LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename);
 
 //パーティクル生成関数
-Particle MakeNewParticle(std::mt19937& randomEngine);
+Particle MakeNewParticle(std::mt19937& randomEngine,const Vector3& translate);
 
 //エミッタからパーティクルを発生させる
 std::list<Particle> Emit(const Emitter& emitter,std::mt19937& randomEngine)
@@ -281,7 +284,7 @@ std::list<Particle> Emit(const Emitter& emitter,std::mt19937& randomEngine)
 	std::list<Particle> particles;
 	for(uint32_t count = 0;count < emitter.count;++count)
 	{
-		particles.push_back(MakeNewParticle(randomEngine));
+		particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
 	}
 	return particles;
 }
@@ -1332,13 +1335,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	std::mt19937 randomEngine(seedGenerator());
 	//パーティクルの生成
 	std::list<Particle> particles;
-	//３つ発生させる
-	particles.push_back(MakeNewParticle(randomEngine));
-	particles.push_back(MakeNewParticle(randomEngine));
-	particles.push_back(MakeNewParticle(randomEngine));
 
 	Emitter emitter;
 	emitter.count = 3;
+	emitter.frequency = 0.5f;
+	emitter.frequencyTime = 0.0f;
+	emitter.transform = {
+		{ 1.0f,1.0f,1.0f },
+		{ 0.0f,0.0f,0.0f },
+		{ 0.0f,0.0f,0.0f }
+	};
 
 	///===================================================================
 	///
@@ -1385,7 +1391,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			{
 				particles.splice(particles.end(), Emit(emitter, randomEngine));
 			}
-
+			ImGui::DragFloat3("EmitterTranslate", &emitter.transform.translate.x, 0.1f);
 			//ImGui::ColorEdit4("Fence Color", &materialData->color.x);
 			/*ImGui::DragFloat3("Instancing Translate", &particles[0].transform.translate.x);
 			ImGui::SliderAngle("Instancing RotateX", &particles[0].transform.rotate.x);
@@ -1435,11 +1441,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			worldViewProjectionMatrixSprite = Multiply(worldMatrixSprite, Multiply(viewMatrixSprite, projectionMatrixSprite));
 			transformationMatrixDataSprite->WVP = worldViewProjectionMatrixSprite;
 			transformationMatrixDataSprite->World = worldMatrixSprite;
-
-			const float kDeltaTime = 1.0f / 60.0f;
 			
 			//instancing
 			uint32_t numInstance = 0;
+			const float kDeltaTime = 1.0f / 60.0f;
 			for(std::list<Particle>::iterator particleItr = particles.begin();particleItr != particles.end();)
 			{
 				if(particleItr->lifeTime <= particleItr->currentTime)
@@ -1447,8 +1452,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 					particleItr= particles.erase(particleItr);
 					continue;
 				}
-				//particle->transform.translate += particle->velocity * kDeltaTime;
-				//particle->currentTime += kDeltaTime;
+				particleItr->transform.translate += particleItr->velocity * kDeltaTime;
+				particleItr->currentTime += kDeltaTime;
 				float alpha = 1.0f - (particleItr->currentTime / particleItr->lifeTime);
 
 				if (numInstance < kNumMaxInstance)
@@ -1477,6 +1482,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 				//次の要素に進める
 				++particleItr;
 			}
+
+			//エミッターの更新
+			emitter.frequencyTime += kDeltaTime;		//時刻を進める
+			if(emitter.frequency <= emitter.frequencyTime)
+			{
+				particles.splice(particles.end(),Emit(emitter, randomEngine));
+				emitter.frequencyTime -= emitter.frequency;
+			}
+
 			//for(uint32_t index = 0;index < kNumMaxInstance;++index)
 			//{
 			//	if(particles[index].lifeTime <= particles[index].currentTime)
@@ -2356,14 +2370,15 @@ MaterialData LoadMaterialTemplateFile(const std::string& directoryPath, const st
 	return materialData;
 }
 
-Particle MakeNewParticle(std::mt19937& randomEngine)
+Particle MakeNewParticle(std::mt19937& randomEngine, const Vector3& translate)
 {
 	Particle particle;
 
 	std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
 	particle.transform.scale = { 1.0f,1.0f,1.0f };
 	particle.transform.rotate = { 0.0f,0.0f,0.0f };
-	particle.transform.translate = { distribution(randomEngine),distribution(randomEngine),distribution(randomEngine) };
+	Vector3 randomTranslate = { distribution(randomEngine),distribution(randomEngine),distribution(randomEngine) };
+	particle.transform.translate = translate + randomTranslate;
 	particle.velocity = { distribution(randomEngine),distribution(randomEngine),distribution(randomEngine) };
 
 	std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
