@@ -1361,7 +1361,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//===================================================
 
 			ImGui::Begin("Settings");
-			ImGui::DragFloat3("Camera Translate", &cameraTransform.translate.x);
+			ImGui::DragFloat3("Camera Translate", &cameraTransform.translate.x,0.1f);
 			ImGui::SliderAngle("Camera RotateX", &cameraTransform.rotate.x);
 			ImGui::SliderAngle("Camera RotateY", &cameraTransform.rotate.y);
 			ImGui::SliderAngle("Camera RotateZ", &cameraTransform.rotate.z);
@@ -1432,16 +1432,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 				float alpha = 1.0f - (particles[index].currentTime / particles[index].lifeTime);
 
 				//ビルボード
-				Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(std::numbers::pi_v<float>);
-				Matrix4x4 billboardMatrix = MakeIdentity4x4();;
+				Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
+				//カメラの回転を適用
+				Matrix4x4 billboardMatrix = MakeIdentity4x4();
+
 				if(useBillboard)
 				{
 					billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
 				}
-				
 				billboardMatrix.m[3][0] = 0.0f;
 				billboardMatrix.m[3][1] = 0.0f;
 				billboardMatrix.m[3][2] = 0.0f;
+				
+
 				Matrix4x4 scaleMatrix = MakeScaleMatrix(particles[index].transform.scale);
 				Matrix4x4 translateMatrix = MakeTranslateMatrix(particles[index].transform.translate);
 
