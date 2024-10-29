@@ -1313,11 +1313,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	std::random_device seedGenerator;
 	std::mt19937 randomEngine(seedGenerator());
 	//パーティクルの生成
-	Particle particles[kNumMaxInstance];
-	for (uint32_t index = 0; index < kNumMaxInstance; ++index)
-	{
-		particles[index] = MakeNewParticle(randomEngine);
-	}
+	std::list<Particle> particles;
+	//３つ発生させる
+	particles.push_back(MakeNewParticle(randomEngine));
+	particles.push_back(MakeNewParticle(randomEngine));
+	particles.push_back(MakeNewParticle(randomEngine));
 
 	///===================================================================
 	///
@@ -1362,11 +1362,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::SliderAngle("Camera RotateZ", &cameraTransform.rotate.z);
 
 			ImGui::ColorEdit4("Fence Color", &materialData->color.x);
-			ImGui::DragFloat3("Instancing Translate", &particles[0].transform.translate.x);
+			/*ImGui::DragFloat3("Instancing Translate", &particles[0].transform.translate.x);
 			ImGui::SliderAngle("Instancing RotateX", &particles[0].transform.rotate.x);
 			ImGui::SliderAngle("Instancing RotateY", &particles[0].transform.rotate.y);
 			ImGui::SliderAngle("Instancing RotateZ", &particles[0].transform.rotate.z);
-			ImGui::SliderFloat3("Instancing", &particles[0].transform.scale.x, 0.0f, 5.0f);
+			ImGui::SliderFloat3("Instancing", &particles[0].transform.scale.x, 0.0f, 5.0f);*/
 
 			ImGui::ColorEdit3("Sprite Color", &materialDataSprite->color.x);
 			ImGui::DragFloat3("Sprite Translate", &transformSprite.translate.x);
@@ -1415,43 +1415,77 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			
 			//instancing
 			uint32_t numInstance = 0;
-			for(uint32_t index = 0;index < kNumMaxInstance;++index)
+			for(std::list<Particle>::iterator particle = particles.begin();particle != particles.end();++particle)
 			{
-				if(particles[index].lifeTime <= particles[index].currentTime)
+				if(particle->lifeTime <= particle->currentTime)
 				{
-					continue;
+					particle = particles.erase(particle);
+					if(particle == particles.end())
+					{
+						break;
+					}
 				}
-
-				//particles[index].transform.translate += particles[index].velocity * kDeltaTime;
-				//particles[index].currentTime += kDeltaTime;
-				float alpha = 1.0f - (particles[index].currentTime / particles[index].lifeTime);
+				//particle->transform.translate += particle->velocity * kDeltaTime;
+				//particle->currentTime += kDeltaTime;
+				float alpha = 1.0f - (particle->currentTime / particle->lifeTime);
 
 				//ビルボード
 				Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
 				//カメラの回転を適用
-				Matrix4x4 billboardMatrix = MakeIdentity4x4();
-
-				if(useBillboard)
-				{
-					billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
-				}
+				Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
 				billboardMatrix.m[3][0] = 0.0f;
 				billboardMatrix.m[3][1] = 0.0f;
 				billboardMatrix.m[3][2] = 0.0f;
-				
 
-				Matrix4x4 scaleMatrix = MakeScaleMatrix(particles[index].transform.scale);
-				Matrix4x4 translateMatrix = MakeTranslateMatrix(particles[index].transform.translate);
+				Matrix4x4 scaleMatrix = MakeScaleMatrix(particle->transform.scale);
+				Matrix4x4 translateMatrix = MakeTranslateMatrix(particle->transform.translate);
 
-				//Matrix4x4 worldMatrixInstancing = MakeAffineMatrix(particles[index].transform.scale, particles[index].transform.rotate, particles[index].transform.translate);
+				//Matrix4x4 worldMatrixInstancing = MakeAffineMatrix(particle->transform.scale, particle->transform.rotate, particle->transform.translate);
 				Matrix4x4 worldMatrixInstancing = scaleMatrix * billboardMatrix * translateMatrix;
 				Matrix4x4 worldViewProjectionMatrixInstancing = Multiply(worldMatrixInstancing, Multiply(viewMatrix, projectionMatrix));
-				instancingData[index].WVP = worldViewProjectionMatrixInstancing;
-				instancingData[index].World = worldMatrixInstancing;
-				instancingData[index].color = particles[index].color;
-				instancingData[index].color.w = alpha;
+				instancingData[numInstance].WVP = worldViewProjectionMatrixInstancing;
+				instancingData[numInstance].World = worldMatrixInstancing;
+				instancingData[numInstance].color = particle->color;
+				instancingData[numInstance].color.w = alpha;
 				++numInstance;
 			}
+			//for(uint32_t index = 0;index < kNumMaxInstance;++index)
+			//{
+			//	if(particles[index].lifeTime <= particles[index].currentTime)
+			//	{
+			//		continue;
+			//	}
+
+			//	//particles[index].transform.translate += particles[index].velocity * kDeltaTime;
+			//	//particles[index].currentTime += kDeltaTime;
+			//	float alpha = 1.0f - (particles[index].currentTime / particles[index].lifeTime);
+
+			//	//ビルボード
+			//	Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
+			//	//カメラの回転を適用
+			//	Matrix4x4 billboardMatrix = MakeIdentity4x4();
+
+			//	if(useBillboard)
+			//	{
+			//		billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
+			//	}
+			//	billboardMatrix.m[3][0] = 0.0f;
+			//	billboardMatrix.m[3][1] = 0.0f;
+			//	billboardMatrix.m[3][2] = 0.0f;
+			//	
+
+			//	Matrix4x4 scaleMatrix = MakeScaleMatrix(particles[index].transform.scale);
+			//	Matrix4x4 translateMatrix = MakeTranslateMatrix(particles[index].transform.translate);
+
+			//	//Matrix4x4 worldMatrixInstancing = MakeAffineMatrix(particles[index].transform.scale, particles[index].transform.rotate, particles[index].transform.translate);
+			//	Matrix4x4 worldMatrixInstancing = scaleMatrix * billboardMatrix * translateMatrix;
+			//	Matrix4x4 worldViewProjectionMatrixInstancing = Multiply(worldMatrixInstancing, Multiply(viewMatrix, projectionMatrix));
+			//	instancingData[index].WVP = worldViewProjectionMatrixInstancing;
+			//	instancingData[index].World = worldMatrixInstancing;
+			//	instancingData[index].color = particles[index].color;
+			//	instancingData[index].color.w = alpha;
+			//	++numInstance;
+			//}
 
 			Matrix4x4 uvTransformMatrix = MakeScaleMatrix(uvTransformSprite.scale);
 			uvTransformMatrix = Multiply(uvTransformMatrix, MakeRotateZMatrix(uvTransformSprite.rotate.z));
