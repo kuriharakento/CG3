@@ -376,7 +376,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//ウィンドウの設定
 	HWND hwnd = CreateWindow(
 		wc.lpszClassName,		//利用するクラス名
-		L"CG3",					//タイトルバーの文字
+		L"LE2B_11_クリハラ_ケント",					//タイトルバーの文字
 		WS_OVERLAPPEDWINDOW,	//よく見るウィンドウスタイル
 		CW_USEDEFAULT,			//表示X座標(WindowsOSに任せる)
 		CW_USEDEFAULT,			//表示Y座標(WindowsOSに任せる)
@@ -1415,6 +1415,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//ImGui
 			//===================================================
 
+#pragma region ImGui
 			//各種設定
 			ImGui::Begin("Settings");
 			//ImGui::ColorEdit4("Fence Color", &materialData->color.x);
@@ -1457,6 +1458,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::DragFloat3("FieldAcceleration", &accelerationField.acceleration.x, 0.1f);
 
 			ImGui::End();
+#pragma endregion
 
 
 			//ゲームの処理が終わり描画処理に入る前にImGuiの内部コマンドを生成する
